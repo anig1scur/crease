@@ -1,23 +1,4 @@
-type Vec3 = { x: number; y: number; z: number };
-type EulerLike = { x?: number; y?: number; z?: number };
-
-export type assetConfig = {
-  src: string;
-  back?: string;
-  width: number;
-  position: Vec3;
-  rotation?: EulerLike;
-  group?: string;
-  normalMapSrc?: string;
-  displacementMapSrc?: string;
-  normalScale?: number;
-  displacementScale?: number;
-  roughness?: number;
-  metalness?: number;
-  coverSrc?: string;
-  castShadow?: boolean;
-  cornerRadius?: number;
-};
+import { type assetConfig } from "./three/types";
 
 const assets = {
   bg: '/bg.png',
@@ -66,7 +47,7 @@ export const assetsConfig: assetConfig[] = [
     src: assets.doubanzoo,
     coverSrc: assets.screenshot, width: 300, position: { x: 395, y: -645, z: 10 }, cornerRadius: 0.1, castShadow: false
   },
-  { src: assets.meidi, width: 90, position: { x: 230, y: -190, z: 10 }, roughness: 0.4 },
+  { src: assets.meidi, width: 90, position: { x: 230, y: -190, z: 10 }, roughness: 0.4, href:"https://douban-zoo.github.io/" },
   { src: assets.webgl, roughness: 0.4, width: 100, position: { x: -120, y: -50, z: -2 }, group: 'stickers' },
   {
     src: assets.threejs,

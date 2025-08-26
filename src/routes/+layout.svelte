@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-  <link
+<link
     rel="icon"
     href={favicon}
   />
