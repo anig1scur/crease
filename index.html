@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    
+		<link rel="modulepreload" href="/crease/_app/immutable/entry/start.Byth4IxA.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/chunks/CJOVRqDj.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/chunks/3bODEIRH.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/chunks/BSdcVKRN.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/entry/app.eCcCu2Fl.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/chunks/DsnmJJEf.js">
+		<link rel="modulepreload" href="/crease/_app/immutable/chunks/DNOVhRYH.js">
+
+    <script type="module">
+        (function () {
+            try {
+                if (import.meta.env.DEV) {
+                    return;
+                }
+                const lang = navigator.language || '';
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+                const inCN = /^zh-CN/i.test(lang) || tz.includes('Shanghai') || tz.includes('Beijing');
+
+                const base = inCN ? 'https://gcore.jsdelivr.net/gh/anig1scur/crease@gh-pages/' : './';
+
+                const baseTag = document.createElement('base');
+                baseTag.href = base;
+                document.head.appendChild(baseTag);
+            } catch { }
+        })();
+    </script>
+</head>
+
+<body data-sveltekit-preload-data="hover">
+    <div style="display: contents">
+			<script>
+				{
+					__sveltekit_1gtbxzk = {
+						base: "/crease",
+						assets: "/crease"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("/crease/_app/immutable/entry/start.Byth4IxA.js"),
+						import("/crease/_app/immutable/entry/app.eCcCu2Fl.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element);
+					});
+				}
+			</script>
+		</div>
+</body>
+
+</html>
