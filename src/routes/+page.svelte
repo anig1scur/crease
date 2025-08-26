@@ -2,7 +2,7 @@
   import {onMount, onDestroy} from 'svelte';
   import * as THREE from 'three';
   import CameraControls from 'camera-controls';
-  import {imageConfigs, SCENE_CONFIG, type ImageConfig} from '../config';
+  import {assetsConfig, SCENE_CONFIG, type assetConfig} from '../config';
   import gsap from 'gsap';
 
   type ThreeState = {
@@ -19,6 +19,37 @@
   let container: HTMLDivElement;
   let threeState: ThreeState | null = null;
   const clock = new THREE.Clock();
+
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  function handleCanvasClick(event: MouseEvent) {
+    if (!threeState) return;
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, threeState.camera);
+
+    const intersects = raycaster.intersectObjects(threeState.createdMeshes);
+
+    if (intersects.length > 0) {
+      const firstObject = intersects[0].object as THREE.Mesh;
+
+      if (firstObject.userData.isVideo && !firstObject.userData.isPlaying) {
+        const {videoElement, videoTexture} = firstObject.userData;
+
+        if (firstObject.material instanceof THREE.MeshStandardMaterial) {
+          firstObject.material.map = videoTexture;
+          firstObject.material.needsUpdate = true;
+        }
+
+        videoElement.play().catch((e) => console.error('Video playback failed on click:', e));
+
+        firstObject.userData.isPlaying = true;
+      }
+    }
+  }
 
   onMount(() => {
     const init = async () => {
@@ -50,16 +81,19 @@
         createdMeshes: [],
       };
 
-      const meshes = await createAllPlanes(imageConfigs, threeState);
+      const meshes = await createAllPlanes(assetsConfig, threeState);
       threeState.createdMeshes = meshes;
       startAnimationLoop();
       window.addEventListener('resize', onResize);
+      container.addEventListener('click', handleCanvasClick);
     };
 
     init();
 
     return () => {
       window.removeEventListener('resize', onResize);
+      container.removeEventListener('click', handleCanvasClick);
+
       cleanup();
     };
   });
@@ -75,7 +109,7 @@
       mesh.material.transparent = true;
 
       const tl = gsap.timeline({
-        delay: index * 0.2 + 1,
+        delay: index * 0.2 + 0.6,
         onComplete: () => {
           mesh.visible = false;
         },
@@ -122,7 +156,7 @@
     });
   }
 
-  async function createAllPlanes(configs: ImageConfig[], state: ThreeState): Promise<THREE.Mesh[]> {
+  async function createAllPlanes(configs: assetConfig[], state: ThreeState): Promise<THREE.Mesh[]> {
     const meshPromises = configs.map((cfg, index) => createPlaneFromConfig(cfg, index, state));
     const meshes = await Promise.all(meshPromises);
 
@@ -148,6 +182,7 @@
     camera.position.set(0, 0, SCENE_CONFIG.cameraZ);
     return camera;
   }
+
   function setupRenderer(el: HTMLElement): THREE.WebGLRenderer {
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -169,12 +204,12 @@
     scene.background = bgTex;
   }
   function setupLights(scene: THREE.Scene) {
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2.5);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x333333, 2.5);
     hemiLight.position.set(0, 1, 0);
     scene.add(hemiLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(100, 100, 600);
-    // dirLight.castShadow = true;
+    dirLight.castShadow = true;
     const {shadowAreaSize, shadowMapSize} = SCENE_CONFIG;
     dirLight.shadow.camera.left = -shadowAreaSize;
     dirLight.shadow.camera.right = shadowAreaSize;
@@ -186,6 +221,10 @@
     dirLight.shadow.mapSize.height = shadowMapSize;
     dirLight.shadow.bias = -0.001;
     scene.add(dirLight);
+
+    const dirLightBack = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLightBack.position.set(100, 100, -600);
+    scene.add(dirLightBack);
   }
   function setupControls(camera: THREE.PerspectiveCamera, domElement: HTMLElement): CameraControls {
     const controls = new CameraControls(camera, domElement);
@@ -198,29 +237,66 @@
     controls.minZoom = 0.5;
     return controls;
   }
-  async function createPlaneFromConfig(config: ImageConfig, index: number, state: ThreeState): Promise<THREE.Mesh> {
+
+  async function createPlaneFromConfig(config: assetConfig, index: number, state: ThreeState): Promise<THREE.Object3D> {
     const {camera, renderer} = state;
-    const colorMap = await loadTexture(config.src, true, renderer);
-    const img = colorMap.image as HTMLImageElement;
-    const naturalAspect = img.width / img.height;
+    const isVideo = config.src.endsWith('.mp4') || config.src.endsWith('.webm');
+
+    let colorMap: THREE.Texture;
+    let naturalAspect = 1;
+    let videoElement: HTMLVideoElement | undefined;
+    let videoTexture: THREE.VideoTexture | undefined;
+
+    if (isVideo) {
+      const video = document.createElement('video');
+      video.src = config.src;
+      video.crossOrigin = 'anonymous';
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      videoElement = video;
+
+      await new Promise<void>((resolve) => {
+        video.addEventListener('loadedmetadata', () => {
+          naturalAspect = video.videoWidth / video.videoHeight;
+          resolve();
+        });
+      });
+
+      videoTexture = new THREE.VideoTexture(video);
+      videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+      if (config.coverSrc) {
+        colorMap = await loadTexture(config.coverSrc, true, renderer);
+      } else {
+        video.play().catch((e) => console.error('Video playback failed:', e));
+        colorMap = videoTexture;
+      }
+    } else {
+      const texture = await loadTexture(config.src, true, renderer);
+      colorMap = texture;
+      const img = texture.image as HTMLImageElement;
+      naturalAspect = img.width / img.height;
+    }
+
+    colorMap.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    colorMap.wrapS = colorMap.wrapT = THREE.ClampToEdgeWrapping;
+
     const worldW = pxToWorldWidth(config.width, config.position.z, camera);
     const worldH = worldW / naturalAspect;
     const segments = config.displacementMapSrc ? 256 : 1;
     const geometry = new THREE.PlaneGeometry(worldW, worldH, segments, segments);
+
     const materialParams: Partial<THREE.MeshStandardMaterialParameters> = {
       map: colorMap,
-      roughness: config.roughness ?? 0.5,
+      roughness: config.roughness ?? 0.6,
       metalness: config.metalness ?? 0.1,
       transparent: true,
       alphaTest: 0.001,
-      side: THREE.DoubleSide,
       depthWrite: true,
       depthTest: true,
-      shadowSide: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: index * 0.1,
     };
+
     if (config.normalMapSrc) {
       materialParams.normalMap = await loadTexture(config.normalMapSrc, false, renderer);
       materialParams.normalScale = new THREE.Vector2(config.normalScale ?? 0.6, config.normalScale ?? 0.6);
@@ -229,16 +305,101 @@
       materialParams.displacementMap = await loadTexture(config.displacementMapSrc, false, renderer);
       materialParams.displacementScale = config.displacementScale ?? 50;
     }
-    const material = new THREE.MeshStandardMaterial(materialParams);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = index > 0;
-    mesh.receiveShadow = index === 0;
-    mesh.renderOrder = config.position.z;
-    mesh.position.set(config.position.x, config.position.y, config.position.z);
-    if (config.rotation) {
-      mesh.rotation.set(config.rotation.x ?? 0, config.rotation.y ?? 0, config.rotation.z ?? 0);
+
+    const frontMaterial = new THREE.MeshStandardMaterial(materialParams);
+
+    if (config.cornerRadius && config.cornerRadius > 0) {
+      frontMaterial.onBeforeCompile = (shader) => {
+        shader.uniforms.uCornerRadius = {value: config.cornerRadius};
+        shader.uniforms.uPlaneSize = {value: new THREE.Vector2(worldW, worldH)};
+        shader.vertexShader = `
+varying vec2 vUv;
+${shader.vertexShader}
+`.replace(`#include <uv_vertex>`, `#include <uv_vertex>\nvUv = uv;`);
+        shader.fragmentShader = `
+uniform float uCornerRadius;
+uniform vec2 uPlaneSize;
+varying vec2 vUv;
+
+float getRoundedAlpha() {
+  vec2 halfSize = uPlaneSize * 0.5;
+  vec2 pos = vUv * uPlaneSize - halfSize;
+  float radius = uCornerRadius * min(halfSize.x, halfSize.y);
+  vec2 d = abs(pos) - (halfSize - vec2(radius));
+  float dist = length(max(d, 0.0));
+  dist -= radius;
+  return 1.0 - smoothstep(0.0, 2.0 / 1024.0, dist);
+}
+
+${shader.fragmentShader}
+`.replace(`#include <alphamap_fragment>`, `#include <alphamap_fragment>\ndiffuseColor.a *= getRoundedAlpha();`);
+      };
     }
-    return mesh;
+
+    if (config.back) {
+      frontMaterial.side = THREE.FrontSide;
+      const frontMesh = new THREE.Mesh(geometry, frontMaterial);
+
+      const backTexture = await loadTexture(config.back, true, renderer);
+      backTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      backTexture.wrapS = backTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+      const backMaterial = new THREE.MeshStandardMaterial({
+        map: backTexture,
+        roughness: config.roughness ?? 0.5,
+        metalness: config.metalness ?? 0.1,
+        transparent: true,
+      });
+
+      const backMesh = new THREE.Mesh(geometry, backMaterial);
+      backMesh.rotation.y = Math.PI;
+
+      const group = new THREE.Group();
+      group.add(frontMesh);
+      group.add(backMesh);
+
+      group.castShadow = config.castShadow ?? true;
+      group.receiveShadow = index === 0;
+      group.renderOrder = config.position.z;
+      group.position.set(config.position.x, config.position.y, config.position.z);
+
+      if (config.rotation) {
+        group.rotation.set(config.rotation.x ?? 0, config.rotation.y ?? 0, config.rotation.z ?? 0);
+      }
+
+      if (isVideo && videoElement && videoTexture) {
+        group.userData = {
+          isVideo: true,
+          isPlaying: !config.coverSrc,
+          videoElement: videoElement,
+          videoTexture: videoTexture,
+        };
+      }
+
+      return group;
+    } else {
+      const mesh = new THREE.Mesh(geometry, frontMaterial);
+
+      mesh.castShadow = config.castShadow ?? true;
+      mesh.receiveShadow = index === 0;
+      mesh.renderOrder = config.position.z;
+      mesh.position.set(config.position.x, config.position.y, config.position.z);
+
+      if (config.rotation) {
+        mesh.rotation.set(config.rotation.x ?? 0, config.rotation.y ?? 0, config.rotation.z ?? 0);
+      }
+
+      if (isVideo && videoElement && videoTexture) {
+        mesh.userData = {
+          isVideo: true,
+          isPlaying: !config.coverSrc,
+          videoElement: videoElement,
+          videoTexture: videoTexture,
+        };
+      }
+
+      return mesh;
+    }
   }
   function pxToWorldWidth(px: number, zWorld: number, camera: THREE.PerspectiveCamera): number {
     const vFov = THREE.MathUtils.degToRad(camera.fov);
