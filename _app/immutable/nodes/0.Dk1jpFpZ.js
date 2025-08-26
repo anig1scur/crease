@@ -1,1 +1,0 @@
-import"../chunks/DsnmJJEf.js";import{c as i,h as m,f as p,s as c,a as n,b as f,$ as l,n as d}from"../chunks/BSdcVKRN.js";var h=f('<link rel="icon" href="/favicon.png"/>');function _(o,e){var a=i();m(t=>{var s=h();l.title="Yanxin's Resume",n(t,s)});var r=p(a);c(r,()=>e.children??d),n(o,a)}export{_ as component};
