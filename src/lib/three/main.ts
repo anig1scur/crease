@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { assetsConfig } from '$lib/config';
 import type { ThreeState } from './types';
+import { pxToWorldWidth } from './utils';
 import { setupCamera, setupRenderer, setupBackground, setupLights, setupControls } from './setup';
 import { createAllPlanes } from './meshFactory';
 
@@ -95,11 +96,15 @@ export function initializeScene(container: HTMLDivElement) {
     setupLights(scene);
 
     const cvGroup = new THREE.Group();
-    cvGroup.position.set(0, -60, 0);
+    const cvGroupY = pxToWorldWidth(-40, 0, camera);
+    cvGroup.position.set(0, cvGroupY, 0);
     scene.add(cvGroup);
 
     const stickerGroup = new THREE.Group();
-    stickerGroup.position.set(-370, 380, 10);
+    const stickerGroupX = pxToWorldWidth(-220, 10, camera);
+    const stickerGroupY = pxToWorldWidth(250, 10, camera);
+    stickerGroup.position.set(stickerGroupX, stickerGroupY, 10);
+
     stickerGroup.scale.set(1.3, 1.3, 1.3);
     cvGroup.add(stickerGroup);
 
@@ -144,7 +149,6 @@ export function initializeScene(container: HTMLDivElement) {
       }
     });
     threeState.renderer?.dispose();
-    console.log('Three.js scene cleaned up.');
   };
 
   init();

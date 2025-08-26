@@ -3,13 +3,13 @@ import type { ThreeState, assetConfig } from './types';
 import { loadTexture, pxToWorldWidth } from './utils';
 import { animateShakingElements } from './animations';
 
+
 async function createPlaneFromConfig(
   config: assetConfig,
   state: ThreeState
 ): Promise<THREE.Object3D> {
   const { camera, renderer } = state;
   const isVideo = config.src.endsWith('.mp4') || config.src.endsWith('.webm');
-
   let colorMap: THREE.Texture;
   let naturalAspect = 1;
   let videoElement: HTMLVideoElement | undefined;
@@ -23,17 +23,14 @@ async function createPlaneFromConfig(
     video.muted = true;
     video.playsInline = true;
     videoElement = video;
-
     await new Promise<void>((resolve) => {
       video.addEventListener('loadedmetadata', () => {
         naturalAspect = video.videoWidth / video.videoHeight;
         resolve();
       });
     });
-
     videoTexture = new THREE.VideoTexture(video);
     videoTexture.colorSpace = THREE.SRGBColorSpace;
-
     if (config.coverSrc) {
       colorMap = await loadTexture(config.coverSrc, true, renderer);
     } else {
@@ -48,7 +45,10 @@ async function createPlaneFromConfig(
   }
 
   const worldW = pxToWorldWidth(config.width, config.position.z, camera);
+  const worldX = pxToWorldWidth(config.position.x, config.position.z, camera);
+  const worldY = pxToWorldWidth(config.position.y, config.position.z, camera);
   const worldH = worldW / naturalAspect;
+
   const segments = config.displacementMapSrc ? 256 : 1;
   const geometry = new THREE.PlaneGeometry(worldW, worldH, segments, segments);
 
@@ -59,7 +59,6 @@ async function createPlaneFromConfig(
     transparent: true,
     alphaTest: 0.001
   };
-
   if (config.normalMapSrc) {
     materialParams.normalMap = await loadTexture(config.normalMapSrc, false, renderer);
     materialParams.normalScale = new THREE.Vector2(config.normalScale ?? 0.6, config.normalScale ?? 0.6);
@@ -68,9 +67,7 @@ async function createPlaneFromConfig(
     materialParams.displacementMap = await loadTexture(config.displacementMapSrc, false, renderer);
     materialParams.displacementScale = config.displacementScale ?? 50;
   }
-
   const frontMaterial = new THREE.MeshStandardMaterial(materialParams);
-
   if (config.cornerRadius && config.cornerRadius > 0) {
     frontMaterial.onBeforeCompile = (shader) => {
       shader.uniforms.uCornerRadius = { value: config.cornerRadius };
@@ -115,7 +112,7 @@ async function createPlaneFromConfig(
     const group = new THREE.Group();
 
     group.add(frontMesh, backMesh);
-    group.position.set(config.position.x, config.position.y, config.position.z);
+    group.position.set(worldX, worldY, config.position.z);
     if (config.rotation) {
       group.rotation.set(config.rotation.x ?? 0, config.rotation.y ?? 0, config.rotation.z ?? 0);
     }
@@ -130,7 +127,8 @@ async function createPlaneFromConfig(
     return group;
   } else {
     const mesh = new THREE.Mesh(geometry, frontMaterial);
-    mesh.position.set(config.position.x, config.position.y, config.position.z);
+
+    mesh.position.set(worldX, worldY, config.position.z);
 
     if (config.href) {
       mesh.userData.href = config.href;
