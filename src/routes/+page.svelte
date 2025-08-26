@@ -1,284 +1,298 @@
 <script lang="ts">
   import {onMount, onDestroy} from 'svelte';
   import * as THREE from 'three';
-  import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+  import CameraControls from 'camera-controls';
+  import {imageConfigs, SCENE_CONFIG, type ImageConfig} from '../config';
+  import gsap from 'gsap';
 
-  type Vec3 = {x: number; y: number; z: number};
-  type EulerLike = {x?: number; y?: number; z?: number};
-
-  type ImageConfig = {
-    src: string;
-    width: number;
-    position: Vec3;
-    rotation?: EulerLike;
-    group?: string;
-
-    normalMapSrc?: string;
-    displacementMapSrc?: string;
-    normalScale?: number;
-    displacementScale?: number;
-    roughness?: number;
-    metalness?: number;
+  type ThreeState = {
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    renderer: THREE.WebGLRenderer;
+    controls: CameraControls;
+    cvGroup: THREE.Group;
+    stickerGroup: THREE.Group;
+    createdMeshes: THREE.Mesh[];
+    animationFrameId?: number;
   };
 
   let container: HTMLDivElement;
-  let scene: THREE.Scene;
-  let camera: THREE.PerspectiveCamera;
-  let renderer: THREE.WebGLRenderer;
-  let controls: OrbitControls;
-  let animateLoop: number;
-  let stickerGroup: THREE.Group;
+  let threeState: ThreeState | null = null;
+  const clock = new THREE.Clock();
 
-  const assets = {
-    bg: '/bg.png',
-    clip: '/clip.png',
-    canvas: '/canvas.png',
-    creative: '/creativec.png',
-    design: '/design.png',
-    math: '/math.png',
-    motion: '/motion.png',
-    threejs: '/threejs.png',
-    webgl: '/webgl.png',
-    name_card: '/name_card.png',
-    meidi: '/meidi.png',
-    screenshot: '/screenshot.png',
-    area_title: '/area_title.png',
-    edu_title: '/edu_title.png',
-    projects_title: '/projects_title.png',
-    techbox_title: '/techbox_title.png',
-    work_title: '/work_title.png',
-  };
+  onMount(() => {
+    const init = async () => {
+      if (!container) return;
+      CameraControls.install({THREE: THREE});
+      const scene = new THREE.Scene();
+      const camera = setupCamera();
+      const renderer = setupRenderer(container);
+      const controls = setupControls(camera, renderer.domElement);
+      await setupBackground(scene, renderer);
+      setupLights(scene);
 
-  const imageConfigs: ImageConfig[] = [
-    {src: assets.bg, width: 800, position: {x: 0, y: 0, z: 0}, roughness: 1, metalness: 0},
-    {src: assets.clip, width: 50, position: {x: -580, y: 860, z: 20}},
-    {src: assets.name_card, width: 500, position: {x: 380, y: 750, z: 10}, rotation: {z: Math.PI / 60}},
-    {src: assets.area_title, width: 200, position: {x: -450, y: 690, z: 5}},
-    {src: assets.edu_title, width: 210, position: {x: 460, y: 400, z: 5}},
-    {src: assets.work_title, width: 340, position: {x: -350, y: 80, z: 5}},
-    {src: assets.projects_title, width: 185, position: {x: 480, y: -200, z: 5}},
-    {src: assets.screenshot, width: 280, position: {x: 400, y: -690, z: 10}},
-    {src: assets.meidi, width: 85, position: {x: 230, y: -200, z: 10}},
-    {src: assets.techbox_title, width: 260, position: {x: -410, y: -620, z: 5}},
+      const cvGroup = new THREE.Group();
+      cvGroup.position.set(0, -60, 0);
+      scene.add(cvGroup);
 
-    {src: assets.webgl, width: 100, position: {x: -120, y: -50, z: -2}, group: 'stickers', normalScale: 0.7},
-    {src: assets.threejs, width: 100, position: {x: 0, y: 0, z: 8}, rotation: {z: -Math.PI / 20}, group: 'stickers'},
-    {src: assets.canvas, width: 100, position: {x: 160, y: 10, z: 2}, rotation: {z: -Math.PI / 60}, group: 'stickers'},
-    {src: assets.motion, width: 120, position: {x: 60, y: 100, z: 4}, rotation: {z: Math.PI / 60}, group: 'stickers'},
-    {
-      src: assets.creative,
-      width: 120,
-      position: {x: -120, y: 70, z: 0},
-      rotation: {z: -Math.PI / 60},
-      group: 'stickers',
-      displacementScale: 0.5,
-    },
-    {src: assets.design, width: 120, position: {x: 0, y: -120, z: 3}, rotation: {z: -0.1}, group: 'stickers'},
-    {src: assets.math, width: 120, position: {x: 130, y: -90, z: 6}, rotation: {z: Math.PI / 20}, group: 'stickers'},
-  ];
+      const stickerGroup = new THREE.Group();
+      stickerGroup.position.set(-370, 380, 10);
+      stickerGroup.scale.set(1.3, 1.3, 1.3);
+      cvGroup.add(stickerGroup);
 
-  const createdPlanes: {
-    mesh: THREE.Mesh;
-    config: ImageConfig;
-    naturalAspect: number; // w/h
-  }[] = [];
+      threeState = {
+        scene,
+        camera,
+        renderer,
+        controls,
+        cvGroup,
+        stickerGroup,
+        createdMeshes: [],
+      };
 
-  function pxToWorldWidth(px: number, zWorld: number): number {
-    const vFov = THREE.MathUtils.degToRad(camera.fov);
-    const dist = Math.abs(camera.position.z - zWorld);
-    const viewHeightAtZ = 2 * Math.tan(vFov / 2) * dist; // world units
-    const pixelsPerWorldUnit = window.innerHeight / viewHeightAtZ;
-    return px / pixelsPerWorldUnit;
-  }
+      const meshes = await createAllPlanes(imageConfigs, threeState);
+      threeState.createdMeshes = meshes;
+      startAnimationLoop();
+      window.addEventListener('resize', onResize);
+    };
 
-  function pixelLikeToWorld(p: Vec3): THREE.Vector3 {
-    return new THREE.Vector3(p.x, p.y, p.z);
-  }
+    init();
 
-  async function loadTexture(url: string, isColor = false): Promise<THREE.Texture> {
-    const loader = new THREE.TextureLoader();
-    return new Promise((resolve, reject) => {
-      loader.load(
-        url,
-        (tex) => {
-          if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-          // tex.generateMipmaps = false;
-          // tex.minFilter = THREE.LinearFilter;
-          // tex.magFilter = THREE.LinearFilter;
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cleanup();
+    };
+  });
 
-          tex.minFilter = THREE.NearestFilter;
-          tex.magFilter = THREE.NearestFilter;
+  onDestroy(() => {
+    cleanup();
+  });
 
-          tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-          resolve(tex);
+  function animateShakingElements(meshes: THREE.Mesh[]) {
+    meshes.forEach((mesh, index) => {
+      if (Array.isArray(mesh.material)) return;
+
+      mesh.material.transparent = true;
+
+      const tl = gsap.timeline({
+        delay: index * 0.2 + 1,
+        onComplete: () => {
+          mesh.visible = false;
         },
-        undefined,
-        reject,
+      });
+
+      tl.to(mesh.rotation, {
+        keyframes: {
+          z: [-0.2, 0, 0.3, -0.3, 0.2, -0.2, 0],
+          ease: 'power2.inOut',
+        },
+        duration: 2,
+      });
+
+      tl.to(
+        mesh.position,
+        {
+          y: mesh.position.y - 600,
+          x: mesh.position.x + (Math.random() - 0.5) * 200,
+          duration: 3,
+          ease: 'power1.in',
+        },
+        '>-0.5',
+      );
+
+      tl.to(
+        mesh.rotation,
+        {
+          z: (Math.random() - 0.5) * Math.PI,
+          duration: 3,
+          ease: 'power1.in',
+        },
+        '<',
+      );
+
+      tl.to(
+        mesh.material,
+        {
+          opacity: 0,
+          duration: 2.5,
+          ease: 'power2.in',
+        },
+        '>-2.5',
       );
     });
   }
 
-  async function createPlaneFromConfig(config: ImageConfig, indexForOffset: number): Promise<THREE.Mesh> {
-    const colorMap = await loadTexture(config.src, true);
+  async function createAllPlanes(configs: ImageConfig[], state: ThreeState): Promise<THREE.Mesh[]> {
+    const meshPromises = configs.map((cfg, index) => createPlaneFromConfig(cfg, index, state));
+    const meshes = await Promise.all(meshPromises);
 
+    meshes.forEach((mesh, index) => {
+      const cfg = configs[index];
+      if (cfg.group === 'stickers') {
+        state.stickerGroup.add(mesh);
+      } else {
+        state.cvGroup.add(mesh);
+      }
+    });
+
+    const shakingMeshes = meshes.filter((_, index) => configs[index].group === 'shaking');
+    if (shakingMeshes.length > 0) {
+      animateShakingElements(shakingMeshes);
+    }
+
+    return meshes;
+  }
+
+  function setupCamera(): THREE.PerspectiveCamera {
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.position.set(0, 0, SCENE_CONFIG.cameraZ);
+    return camera;
+  }
+  function setupRenderer(el: HTMLElement): THREE.WebGLRenderer {
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: true,
+      powerPreference: 'high-performance',
+    });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 4));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NoToneMapping;
+    el.appendChild(renderer.domElement);
+    return renderer;
+  }
+  async function setupBackground(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+    const bgTex = await loadTexture('/wood-texture.png', true, renderer);
+    scene.background = bgTex;
+  }
+  function setupLights(scene: THREE.Scene) {
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2.5);
+    hemiLight.position.set(0, 1, 0);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight.position.set(100, 100, 600);
+    // dirLight.castShadow = true;
+    const {shadowAreaSize, shadowMapSize} = SCENE_CONFIG;
+    dirLight.shadow.camera.left = -shadowAreaSize;
+    dirLight.shadow.camera.right = shadowAreaSize;
+    dirLight.shadow.camera.top = shadowAreaSize;
+    dirLight.shadow.camera.bottom = -shadowAreaSize;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 1500;
+    dirLight.shadow.mapSize.width = shadowMapSize;
+    dirLight.shadow.mapSize.height = shadowMapSize;
+    dirLight.shadow.bias = -0.001;
+    scene.add(dirLight);
+  }
+  function setupControls(camera: THREE.PerspectiveCamera, domElement: HTMLElement): CameraControls {
+    const controls = new CameraControls(camera, domElement);
+    controls.dollyToCursor = true;
+    controls.mouseButtons.left = CameraControls.ACTION.TRUCK;
+    controls.mouseButtons.wheel = CameraControls.ACTION.ZOOM;
+    controls.touches.two = CameraControls.ACTION.TOUCH_DOLLY_TRUCK;
+    controls.mouseButtons.right = CameraControls.ACTION.ROTATE;
+    controls.maxZoom = 100;
+    controls.minZoom = 0.5;
+    return controls;
+  }
+  async function createPlaneFromConfig(config: ImageConfig, index: number, state: ThreeState): Promise<THREE.Mesh> {
+    const {camera, renderer} = state;
+    const colorMap = await loadTexture(config.src, true, renderer);
     const img = colorMap.image as HTMLImageElement;
     const naturalAspect = img.width / img.height;
-
-    const worldW = pxToWorldWidth(config.width, config.position.z);
+    const worldW = pxToWorldWidth(config.width, config.position.z, camera);
     const worldH = worldW / naturalAspect;
-
-    const segments = config.displacementMapSrc ? 128 : 1;
-    const geo = new THREE.PlaneGeometry(worldW, worldH, segments, segments);
-
-    const mats: Partial<THREE.MeshStandardMaterialParameters> = {
+    const segments = config.displacementMapSrc ? 256 : 1;
+    const geometry = new THREE.PlaneGeometry(worldW, worldH, segments, segments);
+    const materialParams: Partial<THREE.MeshStandardMaterialParameters> = {
       map: colorMap,
-      roughness: config.roughness ?? 0.4,
+      roughness: config.roughness ?? 0.5,
       metalness: config.metalness ?? 0.1,
       transparent: true,
       alphaTest: 0.001,
       side: THREE.DoubleSide,
       depthWrite: true,
       depthTest: true,
+      shadowSide: THREE.DoubleSide,
       polygonOffset: true,
-      polygonOffsetFactor: 0,
-      polygonOffsetUnits: indexForOffset * 0.1,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: index * 0.1,
     };
-
     if (config.normalMapSrc) {
-      mats.normalMap = await loadTexture(config.normalMapSrc);
-      mats.normalScale = new THREE.Vector2(config.normalScale ?? 1, config.normalScale ?? 1);
+      materialParams.normalMap = await loadTexture(config.normalMapSrc, false, renderer);
+      materialParams.normalScale = new THREE.Vector2(config.normalScale ?? 0.6, config.normalScale ?? 0.6);
     }
     if (config.displacementMapSrc) {
-      mats.displacementMap = await loadTexture(config.displacementMapSrc);
-      mats.displacementScale = config.displacementScale ?? 0;
-      mats.displacementBias = 0;
+      materialParams.displacementMap = await loadTexture(config.displacementMapSrc, false, renderer);
+      materialParams.displacementScale = config.displacementScale ?? 50;
     }
-
-    const mat = new THREE.MeshStandardMaterial(mats);
-    const mesh = new THREE.Mesh(geo, mat);
+    const material = new THREE.MeshStandardMaterial(materialParams);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = index > 0;
+    mesh.receiveShadow = index === 0;
     mesh.renderOrder = config.position.z;
-
-    const wp = pixelLikeToWorld(config.position);
-    mesh.position.set(wp.x, wp.y, wp.z);
-
+    mesh.position.set(config.position.x, config.position.y, config.position.z);
     if (config.rotation) {
       mesh.rotation.set(config.rotation.x ?? 0, config.rotation.y ?? 0, config.rotation.z ?? 0);
     }
-
-    createdPlanes.push({mesh, config, naturalAspect});
     return mesh;
   }
-
-  function reflowPlanesOnResize() {
-    for (const {mesh, config, naturalAspect} of createdPlanes) {
-      const worldW = pxToWorldWidth(config.width, config.position.z);
-      const worldH = worldW / naturalAspect;
-
-      const hasDisp = !!config.displacementMapSrc;
-      const segments = hasDisp ? 128 : 1;
-      const newGeo = new THREE.PlaneGeometry(worldW, worldH, segments, segments);
-      mesh.geometry.dispose();
-      mesh.geometry = newGeo;
-
-      const wp = pixelLikeToWorld(config.position);
-      mesh.position.set(wp.x, wp.y, wp.z);
-    }
+  function pxToWorldWidth(px: number, zWorld: number, camera: THREE.PerspectiveCamera): number {
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const dist = Math.abs(SCENE_CONFIG.designCameraZ - zWorld);
+    const viewHeightAtZ = 2 * Math.tan(vFov / 2) * dist;
+    const pixelsPerWorldUnit = window.innerHeight / viewHeightAtZ;
+    return px / pixelsPerWorldUnit;
   }
-
-  onMount(async () => {
-    scene = new THREE.Scene();
-
-    {
-      const loader = new THREE.TextureLoader();
-      const bgTex = await new Promise<THREE.Texture>((resolve, reject) => {
-        loader.load(
-          '/wood-texture.png',
-          (t) => {
-            t.colorSpace = THREE.SRGBColorSpace;
-            t.anisotropy = 8;
-            resolve(t);
-          },
-          undefined,
-          reject,
-        );
-      });
-      scene.background = bgTex;
-    }
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
-    camera.position.set(0, 0, 800);
-
-    renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      premultipliedAlpha: true,
-      powerPreference: 'high-performance',
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NoToneMapping;
-    container.appendChild(renderer.domElement);
-
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enableZoom = true;
-    controls.enablePan = true;
-
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
-    hemi.position.set(0, 1, 0);
-    scene.add(hemi);
-
-    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
-    dir.position.set(400, 0, 600);
-    dir.castShadow = false;
-    scene.add(dir);
-
-    stickerGroup = new THREE.Group();
-    stickerGroup.position.set(-400, 380, 10);
-    stickerGroup.scale.set(1.2, 1.2, 1.2);
-    scene.add(stickerGroup);
-
-    let index = 0;
-    for (const cfg of imageConfigs) {
-      const mesh = await createPlaneFromConfig(cfg, index++);
-      if (cfg.group === 'stickers') stickerGroup.add(mesh);
-      else scene.add(mesh);
-    }
-
+  async function loadTexture(url: string, isColor: boolean, renderer: THREE.WebGLRenderer): Promise<THREE.Texture> {
+    const loader = new THREE.TextureLoader();
+    const tex = await loader.loadAsync(url);
+    if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+  }
+  function startAnimationLoop() {
+    if (!threeState) return;
+    const {renderer, scene, camera, controls} = threeState;
     const animate = () => {
-      animateLoop = requestAnimationFrame(animate);
-      controls.update();
+      threeState!.animationFrameId = requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      controls.update(delta);
       renderer.render(scene, camera);
     };
     animate();
-
-    const onResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      reflowPlanesOnResize();
-    };
-    window.addEventListener('resize', onResize);
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-    };
-  });
-
-  onDestroy(() => {
-    if (animateLoop) cancelAnimationFrame(animateLoop);
-    createdPlanes.forEach(({mesh}) => {
+  }
+  function onResize() {
+    if (!threeState) return;
+    const {camera, renderer} = threeState;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  function cleanup() {
+    if (!threeState) return;
+    if (threeState.animationFrameId) {
+      cancelAnimationFrame(threeState.animationFrameId);
+    }
+    threeState.controls?.dispose();
+    threeState.createdMeshes.forEach((mesh) => {
       mesh.geometry?.dispose();
-      const mat = mesh.material as THREE.Material;
-      mat?.dispose();
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach((mat) => mat.dispose());
+      } else {
+        mesh.material?.dispose();
+      }
     });
-    renderer?.dispose();
-  });
+    threeState.renderer?.dispose();
+    console.log('Three.js scene cleaned up.');
+  }
 </script>
 
 <div
   bind:this={container}
-  class="w-full h-full"
+  class="w-full h-full touch-none"
 />
