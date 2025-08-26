@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import CameraControls from 'camera-controls';
-import { SCENE_CONFIG } from '$lib/config';
+import { assets, assetsConfig, SCENE_CONFIG } from '$lib/config';
 import { loadTexture } from './utils';
 
 
@@ -28,7 +28,7 @@ export function setupRenderer(el: HTMLElement): THREE.WebGLRenderer {
 }
 
 export async function setupBackground(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
-  const bgTex = await loadTexture('/wood-texture.png', true, renderer);
+  const bgTex = await loadTexture(assets.wood, true, renderer);
   scene.background = bgTex;
 }
 

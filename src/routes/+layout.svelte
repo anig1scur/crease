@@ -5,11 +5,12 @@
 </script>
 
 <svelte:head>
-<link
+  <link
     rel="icon"
-    href='/favicon.png'
+    href="/favicon.png"
   />
   <title>Yanxin's Resume</title>
+
 </svelte:head>
 
 {@render children?.()}

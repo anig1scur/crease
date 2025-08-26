@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCENE_CONFIG } from '$lib/config';
+import { SCENE_CONFIG, resolveAsset } from '$lib/config';
 
 export async function loadTexture(
 	url: string,
@@ -7,7 +7,7 @@ export async function loadTexture(
 	renderer: THREE.WebGLRenderer
 ): Promise<THREE.Texture> {
 	const loader = new THREE.TextureLoader();
-	const tex = await loader.loadAsync(url);
+	const tex = await loader.loadAsync(resolveAsset(url));
 	if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
 	tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 	tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ThreeState, assetConfig } from './types';
 import { loadTexture, pxToWorldWidth } from './utils';
 import { animateShakingElements } from './animations';
+import { resolveAsset } from '$lib/config';
 
 
 async function createPlaneFromConfig(
@@ -17,7 +18,7 @@ async function createPlaneFromConfig(
 
   if (isVideo) {
     const video = document.createElement('video');
-    video.src = config.src;
+    video.src = resolveAsset(config.src);
     video.crossOrigin = 'anonymous';
     video.loop = true;
     video.muted = true;

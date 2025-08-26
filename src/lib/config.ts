@@ -1,34 +1,47 @@
 import { type assetConfig } from "./three/types";
 
-const assets = {
-  bg: '/bg.png',
-  bgBack: '/bg-back.png',
-  pin: '/pin.png',
-  hat: '/hat.png',
-  canvas: '/canvas.png',
-  creative: '/creativec.png',
-  design: '/design.png',
-  math: '/math.png',
-  motion: '/motion.png',
-  threejs: '/threejs.png',
-  webgl: '/webgl.png',
-  name_card: '/name_card.png',
-  meidi: '/meidi.png',
-  doubanzoo: '/douban-zoo.webm',
-  screenshot: '/screenshot.png',
-  area_title: '/area_title.png',
-  edu_title: '/edu_title.png',
-  projects_title: '/projects_title.png',
-  techbox_title: '/techbox_title.png',
-  work_title: '/work_title.png',
+export function resolveAsset(url: string) {
+  if (!import.meta.env.DEV) {
+    const lang = navigator.language || '';
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const inCN = /^zh-CN/i.test(lang) || tz.includes('Shanghai') || tz.includes('Beijing');
+    return inCN
+      ? `https://cdn.jsdelivr.net/gh/anig1scur/crease@gh-pages/${ url }`
+      : `${ import.meta.env.BASE_URL }${ url }`;
+  }
+  return url;
+}
+
+export const assets = {
+  wood: 'wood-texture.png',
+  bg: 'bg.png',
+  bgBack: 'bg-back.png',
+  pin: 'pin.png',
+  hat: 'hat.png',
+  canvas: 'canvas.png',
+  creative: 'creativec.png',
+  design: 'design.png',
+  math: 'math.png',
+  motion: 'motion.png',
+  threejs: 'threejs.png',
+  webgl: 'webgl.png',
+  name_card: 'name_card.png',
+  meidi: 'meidi.png',
+  doubanzoo: 'douban-zoo.webm',
+  screenshot: 'screenshot.png',
+  area_title: 'area_title.png',
+  edu_title: 'edu_title.png',
+  projects_title: 'projects_title.png',
+  techbox_title: 'techbox_title.png',
+  work_title: 'work_title.png',
 };
 
 export const assetsConfig: assetConfig[] = [
   {
     src: assets.bg,
     back: assets.bgBack,
-    displacementMapSrc: '/textures/paper-displacement.png',
-    normalMapSrc: '/textures/paper-normal.webp',
+    displacementMapSrc: 'textures/paper-displacement.png',
+    normalMapSrc: 'textures/paper-normal.webp',
     width: 800,
     displacementScale: 100,
     normalScale: 1.6,
@@ -36,7 +49,7 @@ export const assetsConfig: assetConfig[] = [
     roughness: 0.7,
   },
   { src: assets.pin, width: 100, position: { x: -340, y: 555, z: 10 }, roughness: 0.4 },
-  { src: assets.hat, width: 195, position: { x: 165, y: 555, z: 12 }, rotation: { z: -Math.PI / 16 }, group: 'shaking' },
+  { src: assets.hat, width: 195, position: { x: 168, y: 550, z: 12 }, rotation: { z: -Math.PI / 16 }, group: 'shaking' },
   { src: assets.name_card, width: 500, position: { x: 270, y: 480, z: 10 }, roughness: 0.4, rotation: { z: Math.PI / 60 } },
   { src: assets.area_title, width: 220, position: { x: -290, y: 460, z: 8 }, castShadow: false, },
   { src: assets.edu_title, width: 230, position: { x: 295, y: 250, z: 8 }, castShadow: false, },
