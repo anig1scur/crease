@@ -6,34 +6,34 @@ export function resolveAsset(url: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     const inCN = /^zh-CN/i.test(lang) || tz.includes('Shanghai') || tz.includes('Beijing');
     return inCN
-      ? `https://cdn.jsdelivr.net/gh/anig1scur/crease@gh-pages/${ url }`
+      ? `https://gcore.jsdelivr.net/gh/anig1scur/crease@gh-pages/${ url }`
       : `${ import.meta.env.BASE_URL }${ url }`;
-  }
+}
   return url;
 }
 
 export const assets = {
-  wood: 'wood-texture.png',
-  bg: 'bg.png',
-  bgBack: 'bg-back.png',
+  wood: 'textures/wood-texture.png',
+  bg: 'bg/bg.png',
+  bgBack: 'bg/bg-back.png',
   pin: 'pin.png',
   hat: 'hat.png',
-  canvas: 'canvas.png',
-  creative: 'creativec.png',
-  design: 'design.png',
-  math: 'math.png',
-  motion: 'motion.png',
-  threejs: 'threejs.png',
-  webgl: 'webgl.png',
+  canvas: 'stickers/canvas.png',
+  creative: 'stickers/creativec.png',
+  design: 'stickers/design.png',
+  math: 'stickers/math.png',
+  motion: 'stickers/motion.png',
+  threejs: 'stickers/threejs.png',
+  webgl: 'stickers/webgl.png',
   name_card: 'name_card.png',
   meidi: 'meidi.png',
   doubanzoo: 'douban-zoo.webm',
   screenshot: 'screenshot.png',
-  area_title: 'area_title.png',
-  edu_title: 'edu_title.png',
-  projects_title: 'projects_title.png',
-  techbox_title: 'techbox_title.png',
-  work_title: 'work_title.png',
+  area_title: 'titles/area_title.png',
+  edu_title: 'titles/edu_title.png',
+  projects_title: 'titles/projects_title.png',
+  techbox_title: 'titles/techbox_title.png',
+  work_title: 'titles/work_title.png',
 };
 
 export const assetsConfig: assetConfig[] = [
