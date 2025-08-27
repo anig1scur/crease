@@ -78,9 +78,9 @@ export function initializeScene(container: HTMLDivElement) {
     const intersects = raycaster.intersectObjects(interactiveObjects, true);
 
     if (intersects.length > 0) {
-      container.style.cursor = 'pointer';
+      container.style.cursor = 'url("cursors/pointer.png") 0 0, auto';
     } else {
-      container.style.cursor = 'default';
+      container.style.cursor = 'url("cursors/default.png") 0 0, auto';
     }
   };
 
