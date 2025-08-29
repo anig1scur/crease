@@ -26,10 +26,17 @@ export function initializeScene(container: HTMLDivElement) {
   const onResize = () => {
     if (!threeState) return;
     const { camera, renderer } = threeState;
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
   };
+
+  const resizeObserver = new ResizeObserver(onResize);
 
   const handleCanvasClick = (event: MouseEvent) => {
     if (!threeState) return;
@@ -122,7 +129,8 @@ export function initializeScene(container: HTMLDivElement) {
     threeState.createdMeshes = meshes;
 
     startAnimationLoop();
-    window.addEventListener('resize', onResize);
+
+    resizeObserver.observe(container);
     container.addEventListener('click', handleCanvasClick);
     container.addEventListener('mousemove', handleCanvasHover);
 
@@ -130,7 +138,7 @@ export function initializeScene(container: HTMLDivElement) {
 
   const destroy = () => {
     if (!threeState) return;
-    window.removeEventListener('resize', onResize);
+    resizeObserver.disconnect();
     container.removeEventListener('click', handleCanvasClick);
     container.removeEventListener('mousemove', handleCanvasHover);
 

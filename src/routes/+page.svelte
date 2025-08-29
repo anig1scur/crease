@@ -21,5 +21,5 @@
 
 <div
   bind:this={container}
-  class="w-full h-full touch-none"
+  class="w-screen h-dvh touch-none"
 />
